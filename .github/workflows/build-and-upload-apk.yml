@@ -1,0 +1,64 @@
+name: Build and upload APK (replace-all)
+
+on:
+  push:
+    branches: [ dev/replace-all ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Set up Android SDK (r0adkll/setup-android)
+        uses: r0adkll/setup-android@v2
+        with:
+          api-level: 33
+          build-tools: '33.0.2'
+
+      - name: Ensure gradlew is executable
+        run: chmod +x ./gradlew || true
+
+      - name: Provide Gradle (fallback to system Gradle if wrapper missing)
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: '8.4'
+
+      - name: Build Debug APK (capture output)
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --no-daemon |& tee gradle-output.log
+          exit ${PIPESTATUS[0]}
+        shell: bash
+
+      - name: Upload debug APK artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubz-os-debug-apk
+          path: app/build/outputs/apk/debug/**/*.apk
+
+      - name: Upload Gradle output log
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-output-log
+          path: gradle-output.log
