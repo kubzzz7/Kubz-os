@@ -1,8 +1,9 @@
-name: Build and upload APK (replace-all)
+name: Build and upload APK (robust)
 
 on:
   push:
     branches: [ dev/replace-all ]
+  workflow_dispatch: {}
 
 jobs:
   build:
@@ -29,29 +30,50 @@ jobs:
           distribution: 'temurin'
           java-version: '11'
 
-      - name: Set up Android SDK (r0adkll/setup-android)
-        uses: r0adkll/setup-android@v2
-        with:
-          api-level: 33
-          build-tools: '33.0.2'
+      - name: Ensure ANDROID_SDK_ROOT exists
+        run: |
+          mkdir -p "$ANDROID_SDK_ROOT"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+
+      - name: Install Android command-line tools
+        run: |
+          set -e
+          curl -sSLo /tmp/commandlinetools.zip https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+          unzip -q /tmp/commandlinetools.zip -d /tmp/cmdline
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+          mv /tmp/cmdline/cmdline-tools/* "$ANDROID_SDK_ROOT/cmdline-tools/latest/"
+          ls -la "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+
+      - name: Install SDK packages (platform-tools, platforms, build-tools)
+        run: |
+          set -e
+          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+          yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+          sdkmanager --list --sdk_root="$ANDROID_SDK_ROOT" || true
+
+      - name: Accept Android SDK licenses
+        run: |
+          set -e
+          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+          yes | sdkmanager --licenses --sdk_root="$ANDROID_SDK_ROOT" || true
 
       - name: Ensure gradlew is executable
         run: chmod +x ./gradlew || true
 
-      - name: Provide Gradle (system or action)
-        uses: gradle/gradle-build-action@v3
-        with:
-          gradle-version: '8.4'
+      - name: Show Java and SDK info
+        run: |
+          java -version
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          ls -la $ANDROID_SDK_ROOT || true
 
-      - name: Build Debug APK (use provided Gradle)
+      - name: Build Debug APK (with verbose logs)
         run: |
           set -o pipefail
-          gradle assembleDebug --no-daemon |& tee gradle-output.log
+          ./gradlew assembleDebug --no-daemon --stacktrace |& tee gradle-output.log
           exit ${PIPESTATUS[0]}
         shell: bash
 
       - name: Upload debug APK artifact
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: kubz-os-debug-apk
