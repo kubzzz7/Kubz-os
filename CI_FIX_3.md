@@ -1,0 +1,1 @@
+CI: install Android command-line tools directly and accept licenses; build debug APK
