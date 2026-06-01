@@ -38,15 +38,15 @@ jobs:
       - name: Ensure gradlew is executable
         run: chmod +x ./gradlew || true
 
-      - name: Provide Gradle (fallback to system Gradle if wrapper missing)
+      - name: Provide Gradle (system or action)
         uses: gradle/gradle-build-action@v3
         with:
           gradle-version: '8.4'
 
-      - name: Build Debug APK (capture output)
+      - name: Build Debug APK (use provided Gradle)
         run: |
           set -o pipefail
-          ./gradlew assembleDebug --no-daemon |& tee gradle-output.log
+          gradle assembleDebug --no-daemon |& tee gradle-output.log
           exit ${PIPESTATUS[0]}
         shell: bash
 
