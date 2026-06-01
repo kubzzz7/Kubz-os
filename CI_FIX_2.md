@@ -1,0 +1,1 @@
+Re-run CI with Android SDK installer (use android-emulator-runner) and ensure gradlew is executable
