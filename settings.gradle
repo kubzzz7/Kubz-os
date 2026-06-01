@@ -1,0 +1,2 @@
+rootProject.name = "kubz-os"
+include ':app'
